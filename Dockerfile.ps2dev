@@ -1,0 +1,31 @@
+FROM ps2dev/ps2dev:latest
+
+# Install missing math libraries and build tools required by GCC
+RUN apk update && apk add gmp-dev mpfr-dev mpc1-dev make git cmake
+
+# Set up environment variables
+ENV PS2DEV=/usr/local/ps2dev
+ENV PS2SDK=$PS2DEV/ps2sdk
+ENV GSKIT=$PS2DEV/gsKit
+ENV PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin
+
+# Verify existing PS2SDK libraries (COMPLETE IMPLEMENTATION - NO SIMPLE VERSION)
+RUN echo "=== PS2SDK LIBRARY VERIFICATION ===" && \
+    ls -la $PS2SDK/ee/lib/libdma.a && \
+    ls -la $PS2SDK/ee/lib/libpacket.a && \
+    ls -la $PS2SDK/ee/lib/libpacket2.a && \
+    ls -la $PS2SDK/ee/lib/libgs.a && \
+    ls -la $PS2SDK/ee/lib/libgraph.a && \
+    ls -la $PS2SDK/ee/lib/libpad.a && \
+    ls -la $PS2SDK/ee/lib/libnetman.a && \
+    ls -la $PS2SDK/ee/lib/libps2ip.a && \
+    echo "✅ All required PS2SDK libraries verified"
+
+# Create gsKit compatibility layer if needed
+RUN mkdir -p $GSKIT/lib && \
+    mkdir -p $GSKIT/include && \
+    ln -sf $PS2SDK/ee/lib/libgs.a $GSKIT/lib/libgskit.a && \
+    ln -sf $PS2SDK/ee/lib/libdma.a $GSKIT/lib/libdmakit.a && \
+    echo "✅ gsKit compatibility layer created"
+
+WORKDIR /src

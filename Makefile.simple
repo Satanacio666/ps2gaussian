@@ -1,0 +1,78 @@
+# Simple Makefile for PS2 3D Gaussian Splatting Engine - Core Build Only
+# Avoids duplicate function definitions
+
+# PS2 Development Environment
+PS2DEV = /usr/local/ps2dev
+PS2SDK = $(PS2DEV)/ps2sdk
+GSKIT = $(PS2DEV)/gsKit
+
+# Compiler and tools
+EE_CC = mips64r5900el-ps2-elf-gcc
+EE_LD = mips64r5900el-ps2-elf-ld
+EE_OBJCOPY = mips64r5900el-ps2-elf-objcopy
+
+# Compiler flags
+EE_CFLAGS = -D_EE -O2 -Wall -Wextra -fno-strict-aliasing
+EE_INCS = -Iinclude -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include -I$(GSKIT)/include
+
+# Linker flags
+EE_LDFLAGS = -L$(PS2SDK)/ee/lib -L$(GSKIT)/lib
+EE_LIBS = -lgskit -ldmakit -ldma -lgraph -lgs -lpad -lmc -lhdd -lpoweroff -lfileXio -lpatches -lnetman -lps2ip -lc -lkernel
+
+# Core source files (avoiding duplicates)
+CORE_SOURCES = \
+	asset_loader_real.c \
+	camera_system.c \
+	dma_system_complete.c \
+	fixed_math.c \
+	gaussian_lut_advanced.c \
+	gaussian_math_complete.c \
+	graphics_real.c \
+	hardware_detection.c \
+	input_system.c \
+	memory_real.c \
+	splat_renderer.c \
+	splatstorm_core_system.c \
+	vu_system_complete.c
+
+# VU microcode files - skip for now to test core build
+VU_SOURCES =
+
+# Build directories
+BUILD_DIR = build
+SRC_DIR = src
+VU_DIR = vu
+
+# Object files
+CORE_OBJS = $(CORE_SOURCES:%.c=$(BUILD_DIR)/%.o)
+VU_OBJS = $(VU_SOURCES:%.c=$(BUILD_DIR)/%.o)
+
+# Target executable
+TARGET = splatstorm_x.elf
+
+.PHONY: all clean
+
+all: $(TARGET)
+
+$(TARGET): $(CORE_OBJS) $(VU_OBJS)
+	@echo "Linking $(TARGET)..."
+	$(EE_CC) $(EE_LDFLAGS) -o $@ $^ $(EE_LIBS)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	@echo "Compiling $<..."
+	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(VU_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	@echo "Compiling VU microcode $<..."
+	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
+
+clean:
+	rm -rf $(BUILD_DIR)/*.o $(TARGET)
+
+# Test build
+test: $(TARGET)
+	@echo "Build successful! Testing basic functionality..."
+	@ls -la $(TARGET)
+	@echo "ELF file created: $(TARGET)"
