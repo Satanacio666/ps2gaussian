@@ -1,0 +1,82 @@
+; SPLATSTORM X - Optimized VU1 Microcode
+; Interleaved processing pattern for maximum performance
+; Target: 16K splats at 60 FPS on real PS2 hardware
+
+.vu
+.globl vu1Splat_CodeStart
+.globl vu1Splat_CodeEnd
+.align 3
+
+vu1Splat_CodeStart:
+    ; Initialize processing
+    nop                     iaddiu vi01, vi00, 0x000   ; Input splat data
+    nop                     iaddiu vi02, vi00, 0x200   ; Output GIF packets
+    nop                     iaddiu vi03, vi00, 512     ; Batch size
+    nop                     iaddiu vi04, vi00, 0x100   ; Matrix data pointer
+    
+    ; Load MVP matrix into vf10-vf13
+    nop                     lqi.xyzw vf10, (vi04++)    ; MVP row 0
+    nop                     lqi.xyzw vf11, (vi04++)    ; MVP row 1
+    nop                     lqi.xyzw vf12, (vi04++)    ; MVP row 2
+    nop                     lqi.xyzw vf13, (vi04++)    ; MVP row 3
+    
+    ; Load screen constants
+    nop                     lqi.xyzw vf20, (vi04++)    ; Screen scale (320, 240, 1, 1)
+    
+    ; Initialize first splat for interleaving
+    nop                     lqi.xyzw vf01, (vi01++)    ; First position
+    nop                     lqi.xyzw vf02, (vi01++)    ; First color
+    nop                     lqi.xyzw vf03, (vi01++)    ; First scale
+    nop                     lqi.xyzw vf04, (vi01++)    ; First rotation
+
+loop_start:
+    ; INTERLEAVED PATTERN: Load next while processing current
+    nop                     lqi.xyzw vf05, (vi01++)    ; Load next position
+    mulax.xyzw acc, vf10, vf01x  nop                   ; Transform current x
+    nop                     lqi.xyzw vf06, (vi01++)    ; Load next color
+    madday.xyzw acc, vf11, vf01y nop                   ; Transform current y
+    maddaz.xyzw acc, vf12, vf01z lqi.xyzw vf07, (vi01++) ; Transform z, load next scale
+    maddw.xyzw vf14, vf13, vf01w lqi.xyzw vf08, (vi01++) ; Complete transform, load next rotation
+    
+    ; Simplified perspective divide (depth scaling)
+    mul.xyz vf14, vf14, vf20 nop                       ; Scale by screen size
+    add.xyz vf14, vf14, vf20 nop                       ; Translate to center
+    
+    ; Apply splat scale for quad size
+    mul.xy vf15, vf03, vf20  nop                       ; Scale splat size to screen
+    
+    ; Generate quad vertices (4 corners around center)
+    sub.xy vf16, vf14, vf15  nop                       ; Top-left
+    add.xy vf17, vf14, vf15  nop                       ; Bottom-right
+    sub.x vf18, vf14, vf15x  nop                       ; Top-right (x)
+    add.y vf18, vf18, vf15y  nop                       ; Top-right (y)
+    add.x vf19, vf14, vf15x  nop                       ; Bottom-left (x)
+    sub.y vf19, vf19, vf15y  nop                       ; Bottom-left (y)
+    
+    ; Store quad vertices + colors for GS
+    nop                     sqi.xyzw vf16, (vi02++)    ; Vertex 1 (top-left)
+    nop                     sqi.xyzw vf02, (vi02++)    ; Color 1
+    nop                     sqi.xyzw vf17, (vi02++)    ; Vertex 2 (bottom-right)
+    nop                     sqi.xyzw vf02, (vi02++)    ; Color 2
+    nop                     sqi.xyzw vf18, (vi02++)    ; Vertex 3 (top-right)
+    nop                     sqi.xyzw vf02, (vi02++)    ; Color 3
+    nop                     sqi.xyzw vf19, (vi02++)    ; Vertex 4 (bottom-left)
+    nop                     sqi.xyzw vf02, (vi02++)    ; Color 4
+    
+    ; Move next splat data to current for next iteration
+    nop                     move.xyzw vf01, vf05       ; Next pos -> current pos
+    nop                     move.xyzw vf02, vf06       ; Next color -> current color
+    nop                     move.xyzw vf03, vf07       ; Next scale -> current scale
+    nop                     move.xyzw vf04, vf08       ; Next rotation -> current rotation
+    
+    ; Loop control
+    nop                     iaddiu vi03, vi03, -1
+    nop                     ibgtz vi03, loop_start
+    
+    ; Kick GIF packet to GS
+    nop                     xgkick vi02
+    
+    ; End program
+    nop[E]                  nop
+
+vu1Splat_CodeEnd:

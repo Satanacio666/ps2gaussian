@@ -1,0 +1,61 @@
+; === VU1 GAUSSIAN PROJECTION MICROCODE (BASIC WORKING VERSION) ===
+; Extremely simple version using only proven working instructions
+; Based exactly on gaussian_simple.vu1 pattern
+
+.vu
+.section .vutext, "ax"
+.global gaussian_projection_basic_start
+.global gaussian_projection_basic_end
+.align 3
+
+gaussian_projection_basic_start:
+    ; Initialize pointers
+    nop                     iaddiu vi01, vi00, 0x000   ; Input data
+    nop                     iaddiu vi02, vi00, 0x200   ; Output data
+    nop                     iaddiu vi03, vi00, 16      ; Batch size
+    nop                     iaddiu vi04, vi00, 0x400   ; Constants
+    
+    ; Load matrices
+    nop                     lqi.xyzw vf10, (vi04++)    ; View matrix row 0
+    nop                     lqi.xyzw vf11, (vi04++)    ; View matrix row 1
+    nop                     lqi.xyzw vf12, (vi04++)    ; View matrix row 2
+    nop                     lqi.xyzw vf13, (vi04++)    ; View matrix row 3
+    
+    nop                     lqi.xyzw vf14, (vi04++)    ; Projection matrix row 0
+    nop                     lqi.xyzw vf15, (vi04++)    ; Projection matrix row 1
+    nop                     lqi.xyzw vf16, (vi04++)    ; Projection matrix row 2
+    nop                     lqi.xyzw vf17, (vi04++)    ; Projection matrix row 3
+    
+    ; Load constants
+    nop                     lqi.xyzw vf20, (vi04++)    ; Math constants
+    nop                     lqi.xyzw vf21, (vi04++)    ; Viewport params
+
+process_loop:
+    ; Load splat data
+    nop                     lqi.xyzw vf01, (vi01++)    ; Position
+    nop                     lqi.xyzw vf02, (vi01++)    ; Covariance
+    nop                     lqi.xyzw vf03, (vi01++)    ; Color
+    
+    ; Transform position to camera space
+    mulax.xyzw acc, vf10, vf01x nop                     ; View transform
+    madday.xyzw acc, vf11, vf01y nop
+    maddaz.xyzw acc, vf12, vf01z nop
+    maddw.xyzw vf04, vf13, vf01w nop                    ; Camera space position
+    
+    ; Transform to clip space
+    mulax.xyzw acc, vf14, vf04x nop                     ; Projection transform
+    madday.xyzw acc, vf15, vf04y nop
+    maddaz.xyzw acc, vf16, vf04z nop
+    maddw.xyzw vf05, vf17, vf04w nop                    ; Clip space position
+    
+    ; Store transformed position as quad vertex
+    nop                     sqi.xyzw vf05, (vi02++)    ; Store vertex
+    nop                     sqi.xyzw vf03, (vi02++)    ; Store color
+    
+    ; Loop control
+    nop                     iaddi vi03, vi03, -1       ; Decrement counter
+    nop                     ibne vi03, vi00, process_loop ; Continue if not zero
+    nop                     nop                        ; Branch delay
+
+gaussian_projection_basic_end:
+    nop                     nop                        ; End marker

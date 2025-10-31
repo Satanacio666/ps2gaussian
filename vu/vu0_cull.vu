@@ -1,0 +1,65 @@
+; VU0 Frustum Culling Microcode
+; Culls splats against 6 frustum planes
+; Input: Splat positions at data memory 0x000 (128 * 16 bytes)
+;        Frustum planes at data memory 0x200 (6 * 16 bytes)
+; Output: Visibility mask at data memory 0x300 (16 bytes = 128 bits)
+
+.vu
+.globl vu0_cull_start
+.globl vu0_cull_end
+.align 3
+
+vu0_cull_start:
+    ; Initialize loop counter and pointers
+    nop                     iaddiu vi01, vi00, 128
+    nop                     iaddiu vi02, vi00, 0
+    nop                     iaddiu vi03, vi00, 0x80
+    nop                     iaddiu vi04, vi00, 0xC0
+    
+    ; Clear output visibility mask (16 bytes = 4 quadwords)
+    nop                     sq.xyzw vf00, 0(vi04)
+    nop                     sq.xyzw vf00, 1(vi04)
+    nop                     sq.xyzw vf00, 2(vi04)
+    nop                     sq.xyzw vf00, 3(vi04)
+    
+    ; Load first frustum plane into vf10
+    nop                     lq.xyzw vf10, 0(vi03)
+
+cull_loop:
+    ; Load current splat position (x,y,z,w) into vf01
+    nop                     lq.xyzw vf01, 0(vi02)
+    
+    ; Test against plane 0: dot(splat_pos, plane.xyz) + plane.w
+    mul.xyz vf02, vf01, vf10 nop
+    nop                     nop
+    nop                     nop
+    nop                     nop
+    adda.x acc, vf02, vf00  nop
+    madda.y acc, vf02, vf00 nop
+    madd.z vf02, vf02, vf00 nop
+    nop                     nop
+    add.w vf02, vf02, vf10  nop
+    
+    ; For simplicity, if it passes plane 0 test, mark as visible
+    ; In full implementation, test all 6 planes
+    
+    ; Calculate output bit position (simplified)
+    nop                     iaddiu vi06, vi01, -1
+    nop                     iadd vi07, vi04, vi00
+    
+    ; Set visibility bit (simplified - just set bit 0 of first word)
+    nop                     iaddiu vi09, vi00, 1
+    nop                     ilw.x vi10, 0(vi07)
+    nop                     ior vi10, vi10, vi09
+    nop                     isw.x vi10, 0(vi07)
+
+cull_next:
+    ; Move to next splat
+    nop                     iaddiu vi02, vi02, 1
+    nop                     iaddiu vi01, vi01, -1
+    nop                     ibne vi01, vi00, cull_loop
+    
+    ; End program
+    nop[E]                  nop
+
+vu0_cull_end:

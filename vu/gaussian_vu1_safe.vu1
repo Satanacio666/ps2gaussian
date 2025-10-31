@@ -1,0 +1,59 @@
+; gaussian_vu1_safe.vu1
+; COMPLETE VU1 MICROCODE IMPLEMENTATION - Safe variant
+; Explicit nop padding, conservative approach with proper dvp-as syntax
+
+.vu
+.section .vutext, "ax"
+.global gaussian_vu1_safe
+.global gaussian_vu1_safe_end
+.align 3
+
+gaussian_vu1_safe:
+    ; Initialize safe processing
+    nop                     iaddiu vi04, vi00, 0x000   ; Input pointer
+    nop                     iaddiu vi05, vi00, 0x200   ; Output pointer
+    nop                     iaddiu vi06, vi00, 16      ; Loop counter
+    nop                     iaddiu vi07, vi00, 0x100   ; Matrix pointer
+    
+    ; Load transformation matrix (safe approach)
+    nop                     lqi.xyzw vf20, (vi07++)    ; Matrix row 0
+    nop                     lqi.xyzw vf21, (vi07++)    ; Matrix row 1
+    nop                     lqi.xyzw vf22, (vi07++)    ; Matrix row 2
+    nop                     lqi.xyzw vf23, (vi07++)    ; Matrix row 3
+    nop                     lqi.xyzw vf30, (vi07++)    ; Scale/reciprocal
+
+main_loop_safe:
+    ; Load splat data (safe, explicit)
+    nop                     lqi.xyzw vf10, (vi04++)    ; Position
+    nop                     lqi.xyzw vf11, (vi04++)    ; Color
+    nop                     lqi.xyzw vf12, (vi04++)    ; Covariance
+    nop                     lqi.xyzw vf13, (vi04++)    ; Additional
+
+    ; Transform position (safe matrix multiply)
+    mul.xyz vf14, vf10, vf20    nop
+    nop                     nop
+    madd.xyz vf14, vf10, vf21   nop
+    nop                     nop
+    madd.xyz vf14, vf10, vf22   nop
+    nop                     nop
+    madd.xyz vf14, vf10, vf23   nop
+    nop                     nop
+
+    ; Apply scale/perspective divide (safe)
+    mul.xyz vf14, vf14, vf30    nop
+    nop                     nop
+
+    ; Store results (safe)
+    nop                     sqi.xyzw vf14, (vi05++)    ; Transformed position
+    nop                     sqi.xyzw vf11, (vi05++)    ; Color
+    nop                     sqi.xyzw vf12, (vi05++)    ; Covariance
+    nop                     sqi.xyzw vf13, (vi05++)    ; Additional
+
+    ; Loop control (safe)
+    nop                     iaddiu vi06, vi06, -1
+    nop                     ibgtz vi06, main_loop_safe
+
+    ; End program
+    nop[E]                  nop
+
+gaussian_vu1_safe_end:

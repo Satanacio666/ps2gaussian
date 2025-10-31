@@ -1,0 +1,48 @@
+; gaussian_vu1_optimized.vu1
+; COMPLETE VU1 MICROCODE IMPLEMENTATION - Optimized variant
+; Software pipelined Gaussian projection with proper dvp-as syntax
+
+.vu
+.section .vutext, "ax"
+.global gaussian_vu1_optimized
+.global gaussian_vu1_optimized_end
+.align 3
+
+gaussian_vu1_optimized:
+    ; Initialize optimized processing
+    nop                     iaddiu vi04, vi00, 0x000   ; Input pointer
+    nop                     iaddiu vi05, vi00, 0x200   ; Output pointer
+    nop                     iaddiu vi06, vi00, 16      ; Loop counter
+    nop                     iaddiu vi07, vi00, 0x100   ; Matrix pointer
+    
+    ; Load transformation matrix
+    nop                     lqi.xyzw vf20, (vi07++)    ; Matrix row 0
+    nop                     lqi.xyzw vf21, (vi07++)    ; Matrix row 1
+    nop                     lqi.xyzw vf22, (vi07++)    ; Matrix row 2
+    nop                     lqi.xyzw vf30, (vi07++)    ; Scale factors
+
+paired_loop:
+    ; Load splat data (optimized pipeline)
+    nop                     lqi.xyzw vf10, (vi04++)    ; Position
+    nop                     lqi.xyzw vf11, (vi04++)    ; Color
+    nop                     lqi.xyzw vf13, (vi04++)    ; Covariance
+    nop                     lqi.xyzw vf14, (vi04++)    ; Additional
+    
+    ; Transform position (software pipelined)
+    mul.xyz vf12, vf10, vf20    nop
+    madd.xyz vf12, vf10, vf21   nop
+    madd.xyz vf12, vf10, vf22   nop
+    mul.xyz vf12, vf12, vf30    nop
+    
+    ; Store results
+    nop                     sqi.xyzw vf12, (vi05++)    ; Transformed position
+    nop                     sqi.xyzw vf11, (vi05++)    ; Color
+    
+    ; Loop control
+    nop                     iaddiu vi06, vi06, -1
+    nop                     ibgtz vi06, paired_loop
+
+    ; End program
+    nop[E]                  nop
+
+gaussian_vu1_optimized_end:

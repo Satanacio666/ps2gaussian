@@ -1,0 +1,95 @@
+; SPLATSTORM X VU1 Microcode - Approximate Gaussian Splatting
+; Based on ps2dev/ps2dev:latest DVP-AS syntax
+; Implements fast quad-based Gaussian splat rendering
+
+.vu
+.section .vutext, "ax"
+.global splatstorm_x_vu1_start
+.global splatstorm_x_vu1_end
+.align 3
+
+splatstorm_x_vu1_start:
+    ; Initialize batch processing
+    nop                     iaddiu vi01, vi00, 0x000   ; Input splat data
+    nop                     iaddiu vi02, vi00, 0x200   ; Output GIF packets
+    nop                     iaddiu vi03, vi00, 16      ; Batch size (16 splats)
+    nop                     iaddiu vi04, vi00, 0x100   ; Matrix data pointer
+    
+    ; Load MVP matrix into vf10-vf13
+    nop                     lqi.xyzw vf10, (vi04++)    ; MVP row 0
+    nop                     lqi.xyzw vf11, (vi04++)    ; MVP row 1
+    nop                     lqi.xyzw vf12, (vi04++)    ; MVP row 2
+    nop                     lqi.xyzw vf13, (vi04++)    ; MVP row 3
+    
+    ; Load screen scale constants
+    nop                     lqi.xyzw vf20, (vi04++)    ; Screen scale (320, 240, 1, 1)
+    nop                     lqi.xyzw vf21, (vi04++)    ; Quad offsets (-1,-1,1,1)
+
+batch_loop:
+    ; Load current splat: pos, color, scale, rotation
+    nop                     lqi.xyzw vf01, (vi01++)    ; Position (x,y,z,1)
+    nop                     lqi.xyzw vf02, (vi01++)    ; Color (r,g,b,a)
+    nop                     lqi.xyzw vf03, (vi01++)    ; Scale (sx,sy,sz,unused)
+    nop                     lqi.xyzw vf04, (vi01++)    ; Rotation quaternion (x,y,z,w)
+    
+    ; Transform splat center to clip space
+    mulax.xyzw acc, vf10, vf01x  nop
+    madday.xyzw acc, vf11, vf01y nop
+    maddaz.xyzw acc, vf12, vf01z nop
+    maddw.xyzw vf05, vf13, vf01w nop
+    
+    ; Simplified perspective divide (no div instruction)
+    nop                     nop
+    nop                     nop
+    nop                     move.xyzw vf06, vf05
+    
+    ; Convert to screen coordinates (simplified)
+    mul.xy vf06, vf06, vf20 nop                        ; Scale by screen size
+    add.xy vf06, vf06, vf20 nop                        ; Translate to center
+    
+    ; Apply splat scale for quad size (approximate Gaussian)
+    mul.xy vf07, vf03, vf20 nop                        ; Scale splat size to screen
+    
+    ; Generate quad vertices (4 corners around center)
+    ; Corner 1: top-left
+    sub.x vf08, vf06, vf07x nop                        ; x - scale_x
+    sub.y vf08, vf06, vf07y nop                        ; y - scale_y
+    nop                     move.zw vf08, vf06         ; Keep z,w
+    
+    ; Corner 2: top-right  
+    add.x vf09, vf06, vf07x nop                        ; x + scale_x
+    sub.y vf09, vf06, vf07y nop                        ; y - scale_y
+    nop                     move.zw vf09, vf06         ; Keep z,w
+    
+    ; Corner 3: bottom-left
+    sub.x vf14, vf06, vf07x nop                        ; x - scale_x
+    add.y vf14, vf06, vf07y nop                        ; y + scale_y
+    nop                     move.zw vf14, vf06         ; Keep z,w
+    
+    ; Corner 4: bottom-right
+    add.x vf15, vf06, vf07x nop                        ; x + scale_x
+    add.y vf15, vf06, vf07y nop                        ; y + scale_y
+    nop                     move.zw vf15, vf06         ; Keep z,w
+    
+    ; Build GIF packet for quad (triangle strip)
+    ; Store vertices with color and texture coordinates
+    nop                     sqi.xyzw vf08, (vi02++)    ; Vertex 1 position
+    nop                     sqi.xyzw vf02, (vi02++)    ; Vertex 1 color
+    nop                     sqi.xyzw vf09, (vi02++)    ; Vertex 2 position  
+    nop                     sqi.xyzw vf02, (vi02++)    ; Vertex 2 color
+    nop                     sqi.xyzw vf14, (vi02++)    ; Vertex 3 position
+    nop                     sqi.xyzw vf02, (vi02++)    ; Vertex 3 color
+    nop                     sqi.xyzw vf15, (vi02++)    ; Vertex 4 position
+    nop                     sqi.xyzw vf02, (vi02++)    ; Vertex 4 color
+    
+    ; Decrement batch counter and loop
+    nop                     iaddiu vi03, vi03, -1
+    nop                     ibgtz vi03, batch_loop
+    
+    ; Kick GIF packet to GS (simplified)
+    nop                     nop
+    
+    ; End program
+    nop[E]                  nop
+
+splatstorm_x_vu1_end:

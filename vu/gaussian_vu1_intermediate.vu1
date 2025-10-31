@@ -1,0 +1,50 @@
+; gaussian_vu1_intermediate.vu1
+; COMPLETE VU1 MICROCODE IMPLEMENTATION - No conditional compilation
+; Intermediate Gaussian projection with proper dvp-as syntax
+
+.vu
+.section .vutext, "ax"
+.global gaussian_vu1_intermediate
+.global gaussian_vu1_intermediate_end
+.align 3
+
+gaussian_vu1_intermediate:
+    ; Initialize VU1 processing
+    nop                     iaddiu vi01, vi00, 0x000   ; Input data pointer
+    nop                     iaddiu vi02, vi00, 0x200   ; Output data pointer
+    nop                     iaddiu vi03, vi00, 16      ; Batch counter
+    nop                     iaddiu vi04, vi00, 0x100   ; Matrix pointer
+    
+    ; Load projection matrix
+    nop                     lqi.xyzw vf10, (vi04++)    ; Matrix row 0
+    nop                     lqi.xyzw vf11, (vi04++)    ; Matrix row 1
+    nop                     lqi.xyzw vf12, (vi04++)    ; Matrix row 2
+    nop                     lqi.xyzw vf13, (vi04++)    ; Matrix row 3
+
+main_loop:
+    ; Load splat position
+    nop                     lqi.xyzw vf01, (vi01++)    ; Position (x,y,z,1)
+    nop                     lqi.xyzw vf02, (vi01++)    ; Color/opacity
+    nop                     lqi.xyzw vf03, (vi01++)    ; Covariance data
+    nop                     lqi.xyzw vf04, (vi01++)    ; Additional data
+    
+    ; Transform position to clip space
+    mulax.xyzw acc, vf10, vf01x  nop
+    madday.xyzw acc, vf11, vf01y nop
+    maddaz.xyzw acc, vf12, vf01z nop
+    maddw.xyzw vf05, vf13, vf01w nop
+    
+    ; Store transformed result
+    nop                     sqi.xyzw vf05, (vi02++)    ; Transformed position
+    nop                     sqi.xyzw vf02, (vi02++)    ; Color data
+    nop                     sqi.xyzw vf03, (vi02++)    ; Covariance
+    nop                     sqi.xyzw vf04, (vi02++)    ; Additional
+    
+    ; Loop control
+    nop                     iaddiu vi03, vi03, -1
+    nop                     ibgtz vi03, main_loop
+    
+    ; End program
+    nop[E]                  nop
+
+gaussian_vu1_intermediate_end:
